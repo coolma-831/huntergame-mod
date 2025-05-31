@@ -1,9 +1,11 @@
+cat > src/main/resources/META-INF/mods.toml << 'EOL'
 modLoader="javafml"
 loaderVersion="[47,)"
-license="All Rights Reserved"
+license="MIT"
 [[mods]]
 modId="huntergame"
 version="1.0"
 displayName="猎人游戏"
 description="猎人追逐逃生者的游戏模式"
 authors="YourName"
+EOL
