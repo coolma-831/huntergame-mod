@@ -1,0 +1,48 @@
+name: Build Minecraft Mod
+
+on:
+  workflow_dispatch:  # 允许手动触发
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Setup Forge environment
+      run: |
+        # 下载 Forge MDK
+        wget https://maven.minecraftforge.net/net/minecraftforge/forge/1.20.1-47.1.0/forge-1.20.1-47.1.0-mdk.zip
+        unzip forge-1.20.1-47.1.0-mdk.zip -d forge-mdk
+        
+        # 复制源文件到 MDK
+        mkdir -p forge-mdk/src/main/java/com/example/huntergame
+        cp -r src/main/java/com/example/huntergame/* forge-mdk/src/main/java/com/example/huntergame/
+        
+        # 复制资源文件
+        cp -r src/main/resources forge-mdk/src/main/
+        
+        # 移动到工作目录
+        mv forge-mdk/* .
+        rm -rf forge-mdk
+        
+    - name: Build Mod
+      run: |
+        chmod +x gradlew
+        ./gradlew build
+        
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: mod
+        path: build/libs/
