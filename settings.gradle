@@ -1,0 +1,11 @@
+rootProject.name = 'huntergame-mod'
+pluginManagement {
+    repositories {
+        // 添加 Forge 官方仓库
+        maven { 
+            url = 'https://maven.minecraftforge.net/' 
+        }
+        // 保留 Gradle 官方仓库
+        gradlePluginPortal()
+    }
+}
