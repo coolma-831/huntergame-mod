@@ -1,10 +1,9 @@
-name: Build and Publish Minecraft Mod
+name: Build Minecraft Mod
 
 on:
   workflow_dispatch:  # 允许手动触发
   push:
     branches: [ main ]
-  pull_request: {}    # 在 PR 时也运行
 
 jobs:
   build:
@@ -16,7 +15,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0  # 获取所有历史记录
+        fetch-depth: 0
     
     # 2. 设置 Java 环境
     - name: Set up JDK 17
@@ -24,37 +23,109 @@ jobs:
       with:
         distribution: 'temurin'
         java-version: '17'
-        cache: 'gradle'
     
     # 3. 设置 Forge 开发环境
     - name: Setup Forge environment
       run: |
-        # 下载最新版 Forge MDK
-        FORGE_VERSION="1.20.1-47.1.0"
-        wget "https://maven.minecraftforge.net/net/minecraftforge/forge/$FORGE_VERSION/forge-$FORGE_VERSION-mdk.zip"
-        unzip "forge-$FORGE_VERSION-mdk.zip" -d forge-mdk
+        # 创建完整的项目结构
+        mkdir -p src/main/java/com/example/huntergame
+        mkdir -p src/main/resources/META-INF
+        mkdir -p gradle/wrapper
         
-        # 复制源文件
-        mkdir -p forge-mdk/src/main/java/com/example/huntergame
-        cp -r src/main/java/com/example/huntergame/* forge-mdk/src/main/java/com/example/huntergame/
+        # 创建必要的 Gradle 文件
+        cat > build.gradle << 'EOL'
+        plugins {
+            id 'net.minecraftforge.gradle' version '5.1.44'
+        }
         
-        # 复制资源文件
-        if [ -d "src/main/resources" ]; then
-          cp -r src/main/resources forge-mdk/src/main/
-        fi
+        version = '1.0'
+        group = 'com.example.huntergame'
+        archivesBaseName = 'huntergame'
         
-        # 移动到工作目录
-        mv forge-mdk/* .
-        rm -rf forge-mdk
+        java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+        
+        minecraft {
+            mappings channel: 'official', version: '1.20.1'
+            
+            runs {
+                client {
+                    workingDirectory project.file('run')
+                    property 'forge.logging.console.level', 'debug'
+                    mods {
+                        huntergame {
+                            source sourceSets.main
+                        }
+                    }
+                }
+            }
+        }
+        
+        dependencies {
+            minecraft 'net.minecraftforge:forge:1.20.1-47.1.0'
+        }
+        
+        jar {
+            manifest {
+                attributes([
+                    "Specification-Title": "huntergame",
+                    "Specification-Version": "1",
+                    "Implementation-Title": project.name,
+                    "Implementation-Version": "1.0",
+                    "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+                ])
+            }
+        }
+        
+        // 确保包含资源文件
+        processResources {
+            from('src/main/resources') {
+                include '**'
+            }
+        }
+        EOL
+        
+        cat > settings.gradle << 'EOL'
+        rootProject.name = 'huntergame-mod'
+        EOL
+        
+        cat > gradle/wrapper/gradle-wrapper.properties << 'EOL'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-7.5.1-bin.zip
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        EOL
+        
+        # 创建必要的资源文件
+        cat > src/main/resources/META-INF/mods.toml << 'EOL'
+        modLoader="javafml"
+        loaderVersion="[47,)"
+        license="All Rights Reserved"
+        [[mods]]
+        modId="huntergame"
+        version="1.0"
+        displayName="猎人游戏"
+        description="猎人追逐逃生者的游戏模式"
+        authors="YourName"
+        EOL
+        
+        cat > src/main/resources/META-INF/accesstransformer.cfg << 'EOL'
+        # 空访问转换器文件
+        EOL
         
         # 添加执行权限
         chmod +x gradlew
         
-        echo "Forge $FORGE_VERSION 环境设置完成"
+        echo "Forge 开发环境设置完成"
     
     # 4. 构建 Mod
     - name: Build Mod with Gradle
-      run: ./gradlew build --no-daemon --stacktrace
+      run: |
+        # 初始化 Gradle Wrapper
+        ./gradlew wrapper --gradle-version 7.5.1
+        
+        # 执行构建
+        ./gradlew build --no-daemon --stacktrace
     
     # 5. 上传构建产物
     - name: Upload Artifact
@@ -64,30 +135,13 @@ jobs:
         path: build/libs/*.jar
         retention-days: 5
     
-    # 6. 发布到 GitHub Release (可选)
-    - name: Create Release
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: build/libs/*.jar
-        generate_release_notes: true
-        draft: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    # 7. 缓存清理
-    - name: Clean up Gradle cache
-      if: always()
+    # 6. 添加调试信息 (可选)
+    - name: Debug file structure
+      if: failure()
       run: |
-        rm -rf ~/.gradle/caches
-        
-    # 8. 构建结果通知
-    - name: Notify build status
-      if: always()
-      uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_COLOR: ${{ job.status }} # 根据状态设置颜色
-        SLACK_TITLE: 'Minecraft Mod Build'
-        SLACK_MESSAGE: 'Build ${{ job.status }} for ${{ github.repository }}'
-        SLACK_USERNAME: 'GitHub Actions'
+        echo "当前目录结构:"
+        ls -laR
+        echo "Gradle 文件内容:"
+        cat build.gradle
+        cat settings.gradle
+        cat gradle/wrapper/gradle-wrapper.properties
