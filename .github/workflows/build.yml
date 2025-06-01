@@ -24,7 +24,7 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
     
-    # 3. 设置 Forge 开发环境 (已修复插件仓库问题)
+    # 3. 设置 Forge 开发环境
     - name: Setup Forge environment
       run: |
         # 创建完整的项目结构
@@ -112,11 +112,11 @@ jobs:
         zipStorePath=wrapper/dists
         EOL
         
-        # 创建必要的资源文件
+        # 修复 mods.toml 配置（移除无效行和重复license）
         cat > src/main/resources/META-INF/mods.toml << 'EOL'
         modLoader="javafml"
         loaderVersion="[47,)"
-        license="All Rights Reserved"
+        license="MIT"
         [[mods]]
         modId="huntergame"
         version="1.0"
@@ -131,13 +131,15 @@ jobs:
         
         echo "Forge 开发环境设置完成"
     
-    # 4. 初始化 Gradle Wrapper (简化版)
+    # 4. 正确初始化 Gradle Wrapper
     - name: Initialize Gradle Wrapper
       run: |
-        # 更简单的初始化方式
+        # 下载必要的Wrapper文件
+        wget -q https://raw.githubusercontent.com/gradle/gradle/v7.5.1/gradlew
+        wget -q https://raw.githubusercontent.com/gradle/gradle/v7.5.1/gradlew.bat
+        chmod +x gradlew
         wget -q https://github.com/gradle/gradle/raw/v7.5.1/gradle/wrapper/gradle-wrapper.jar -P gradle/wrapper/
-        echo 'distributionUrl=https\://services.gradle.org/distributions/gradle-7.5.1-bin.zip' > gradle/wrapper/gradle-wrapper.properties
-        chmod +x gradlew 2>/dev/null || true
+        
         echo "Gradle Wrapper 初始化完成"
     
     # 5. 构建 Mod (添加重试机制)
@@ -158,7 +160,7 @@ jobs:
         path: build/libs/*.jar
         retention-days: 5
     
-    # 7. 添加调试信息 (增强版)
+    # 7. 添加调试信息
     - name: Debug file structure
       if: always()
       run: |
